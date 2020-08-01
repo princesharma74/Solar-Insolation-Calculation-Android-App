@@ -82,7 +82,29 @@
             android:padding="8dp">
 
             <TextView
+                android:id="@+id/azimuth"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="10dp"
+                android:layout_marginRight="10dp"
+                android:fontFamily="@font/antic"
+                android:text="000.00"
+                android:textColor="#fff"
+                android:textSize="20sp" />
+
+            <TextView
                 android:id="@+id/angleOfElevation"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="10dp"
+                android:layout_marginRight="10dp"
+                android:fontFamily="@font/antic"
+                android:text="000.00"
+                android:textColor="#fff"
+                android:textSize="20sp" />
+
+            <TextView
+                android:id="@+id/angleOfRotation"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginLeft="10dp"

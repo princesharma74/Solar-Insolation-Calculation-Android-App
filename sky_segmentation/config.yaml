@@ -1,0 +1,20 @@
+url:
+    skyfinder: "https://mypages.valdosta.edu/rpmihail/skyfinder/images/"
+    metadata: "https://mypages.valdosta.edu/rpmihail/skyfinder/analysis/complete_table_with_mcr.csv"
+    
+path:
+    root: "data"
+    images: "data/images"
+    masks: "data/masks"
+    images_cat: "home/mihail/mypages/rpmihail/skyfinder/images"
+
+train:
+    batch_size: 32
+    train_split: 0.9
+    epochs: 10
+    learning_rate: 0.0001
+    save_path: "sky_model.pt"
+    normalize:
+        imagenet:
+            mean: [0.485, 0.456, 0.406]
+            std: [0.229, 0.224, 0.225]

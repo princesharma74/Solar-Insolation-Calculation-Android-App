@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".SolarPath">
+
+    <com.github.mikephil.charting.charts.LineChart
+        android:layout_width="380dp"
+        android:layout_height="300dp"
+        android:id="@+id/lineChart1"/>
+
+    <com.github.mikephil.charting.charts.LineChart
+        android:layout_width="320dp"
+        android:layout_height="320dp"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="12dp"
+        android:layout_below="@id/lineChart1"
+        android:id="@+id/chart2"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/antic"
+        android:textSize="18sp"
+        android:id="@+id/location"
+        android:text="Location: "
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="35dp"/>
+
+</RelativeLayout>

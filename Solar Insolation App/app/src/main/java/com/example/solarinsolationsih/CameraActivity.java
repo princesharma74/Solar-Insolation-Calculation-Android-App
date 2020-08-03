@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.ImageFormat;
 import android.graphics.Matrix;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -18,19 +19,26 @@ import android.util.Log;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import com.otaliastudios.cameraview.BitmapCallback;
 import com.otaliastudios.cameraview.CameraListener;
 import com.otaliastudios.cameraview.CameraView;
 import com.otaliastudios.cameraview.PictureResult;
+import com.otaliastudios.cameraview.frame.Frame;
+import com.otaliastudios.cameraview.frame.FrameProcessor;
+import com.otaliastudios.cameraview.size.Size;
+import com.otaliastudios.cameraview.size.SizeSelector;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
@@ -46,14 +54,69 @@ import okhttp3.Response;
 public class CameraActivity extends AppCompatActivity {
 
     private CameraView camera;
-    private ImageButton capture;
     private ImageView backButton;
-    private TextView textAzimuth, textAoE, textAoR;
+    private ProgressBar progressBar;
     private byte[] imageArray;
+    private ImageButton record;
     private Bitmap imageBitmap;
-    private File pictureFile;
-    private String postUrl;
+    private boolean mIsRecording = false;
+    private File csvFile, frameFile;
+    private StringBuilder csvData;
+    private ArrayList<ArrayList<Float>> spatial_angles;
+    private ArrayList<Bitmap> bitmapArrayList;
+    private long prevTime;
     private float mAzimuth, mAngleOfElevation, mAngleOfRotation;
+    private String postUrl, url;
+
+    FrameProcessor frameProcessor = new FrameProcessor() {
+        @Override
+        public void process(@NonNull Frame frame) {
+            long curTime = System.currentTimeMillis();
+            if (mIsRecording && (curTime >= prevTime + 500)) {
+                if (frame.getDataClass() == byte[].class) {
+                    Log.d("TAG", "FrameProcessorMessage: Processing frames in byte array.");
+                    File imageFile = new File(frameFile.getAbsolutePath(), System.currentTimeMillis() + ".jpg");
+                    byte[] data = frame.getData();
+                    try {
+                        FileOutputStream fileOutputStream = new FileOutputStream(imageFile);
+                        fileOutputStream.write(data);
+                        fileOutputStream.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                } else if (frame.getDataClass() == Image.class) {
+                    Log.d("TAG", "FrameProcessorMessage: Processing frames in image class.");
+                    Log.d("TAG", "Image Rotation: " + frame.getRotationToUser() + ", " + frame.getRotationToView());
+                    ArrayList<Float> values = new ArrayList<>();
+                    values.add(mAzimuth);
+                    values.add(mAngleOfElevation);
+                    values.add(mAngleOfRotation);
+                    spatial_angles.add(values);
+                    long time = System.currentTimeMillis();
+                    File imageFile = new File(frameFile.getAbsolutePath(), time + ".jpg");
+                    csvData.append("\n").append(mAzimuth).append(", ").append(mAngleOfElevation).append(", ").append(mAngleOfRotation).append(", ").append(time);
+                    Image data = frame.getData();
+                    ByteBuffer buffer = data.getPlanes()[0].getBuffer();
+                    byte[] bytes = new byte[buffer.remaining()];
+                    buffer.get(bytes);
+                    Bitmap tempBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, null);
+                    Matrix rotateRight = new Matrix();
+                    rotateRight.preRotate(90);
+                    Bitmap bitmap = Bitmap.createBitmap(tempBitmap, 0, 0, tempBitmap.getWidth(), tempBitmap.getHeight(), rotateRight, true);
+                    bitmapArrayList.add(bitmap);
+                    try {
+                        FileOutputStream fileOutputStream = new FileOutputStream(imageFile);
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fileOutputStream);
+                        fileOutputStream.close();
+                        data.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+                prevTime = curTime;
+            }
+        }
+    };
 
     private SensorEventListener sensorEventListener_for_gravity = new SensorEventListener() {
         @Override
@@ -62,7 +125,6 @@ public class CameraActivity extends AppCompatActivity {
             float y = event.values[1];
             double angle = Math.atan2(x, y);
             mAngleOfRotation = Float.parseFloat(String.format(Locale.getDefault(), "%.2f", ((float) Math.toDegrees(angle))));
-            textAoR.setText(String.valueOf(mAngleOfRotation));
         }
 
         @Override
@@ -104,9 +166,6 @@ public class CameraActivity extends AppCompatActivity {
                     mAngleOfElevation = Float.parseFloat(String.format(Locale.getDefault(), "%.2f", ((float) Math.toDegrees(angle_of_elevation))));
                     if (R[8] >= 0) {
                         mAngleOfElevation *= -1;
-                        textAoE.setText(String.valueOf(mAngleOfElevation)); //NEGATIVE ANGLE OF ELEVATION
-                    } else {
-                        textAoE.setText(String.valueOf(mAngleOfElevation));
                     }
 
                     // Calculation of Azimuth...
@@ -116,7 +175,6 @@ public class CameraActivity extends AppCompatActivity {
                     if (mAzimuth < 0) {
                         mAzimuth = 360 + mAzimuth;
                     }
-                    textAzimuth.setText(String.valueOf(mAzimuth));
                 }
             }
 
@@ -134,16 +192,18 @@ public class CameraActivity extends AppCompatActivity {
         setContentView(R.layout.activity_camera);
 
         camera = findViewById(R.id.cameraView);
-        capture = findViewById(R.id.capture);
         backButton = findViewById(R.id.backButton);
-        textAzimuth = findViewById(R.id.azimuth);
-        textAoE = findViewById(R.id.angleOfElevation);
-        textAoR = findViewById(R.id.angleOfRotation);
+        progressBar = findViewById(R.id.progressBar);
+        record = findViewById(R.id.record);
 
         camera.setLifecycleOwner(this);
         camera.open();
-
-        postUrl = "http://192.168.0.108:5000/predict";
+        camera.setFrameProcessingFormat(ImageFormat.JPEG);
+        Intent intent = getIntent();
+        url = intent.getStringExtra("url");
+        postUrl = url + "/predict";
+        spatial_angles = new ArrayList<ArrayList<Float>>();
+        bitmapArrayList = new ArrayList<>();
 
         SensorManager manager = (SensorManager) this.getSystemService(Context.SENSOR_SERVICE);
         Sensor accelerometer = manager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
@@ -152,23 +212,29 @@ public class CameraActivity extends AppCompatActivity {
         manager.registerListener(sensorEventListener, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
         manager.registerListener(sensorEventListener, magnetometer, SensorManager.SENSOR_DELAY_NORMAL);
 
-        camera.addCameraListener(new CameraListener() {
-            @Override
-            public void onPictureTaken(@NonNull PictureResult result) {
-                imageArray = result.getData();
-                Bitmap tempBitmap = BitmapFactory.decodeByteArray(imageArray, 0, imageArray.length, null);
-                Matrix rotateRight = new Matrix();
-                rotateRight.preRotate(90);
-                imageBitmap = Bitmap.createBitmap(tempBitmap, 0, 0, tempBitmap.getWidth(), tempBitmap.getHeight(), rotateRight, true);
-                connectServer();
-            }
-        });
-
-        capture.setOnClickListener(new View.OnClickListener() {
+        record.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                createFile();
-                camera.takePicture();
+                if (mIsRecording) {
+                    record.setImageResource(R.mipmap.ic_video_green);
+                    mIsRecording = false;
+                    camera.removeFrameProcessor(frameProcessor);
+                    try {
+                        FileOutputStream fileOutputStream = new FileOutputStream(csvFile);
+                        fileOutputStream.write(csvData.toString().getBytes());
+                        fileOutputStream.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+//                    connectServer();
+
+                } else {
+                    record.setImageResource(R.mipmap.ic_video_red);
+                    createFile();
+                    camera.addFrameProcessor(frameProcessor);
+                    mIsRecording = true;
+                    prevTime = System.currentTimeMillis();
+                }
             }
         });
 
@@ -182,20 +248,31 @@ public class CameraActivity extends AppCompatActivity {
 
     private void connectServer() {
 
-        ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        imageBitmap.compress(Bitmap.CompressFormat.JPEG, 100, stream);
-        byte[] byteArray = stream.toByteArray();
-        RequestBody postBodyImage = new MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("image", "androidFlask.jpg", RequestBody.create(MediaType.parse("image/*jpg"), byteArray))
-                .build();
+        MultipartBody.Builder multipartBodyBuilder = new MultipartBody.Builder().setType(MultipartBody.FORM);
 
+        for (int i = 0; i < bitmapArrayList.size(); i++) {
+
+            ByteArrayOutputStream stream = new ByteArrayOutputStream();
+            Bitmap bitmap = bitmapArrayList.get(i);
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, stream);
+            byte[] byteArray = stream.toByteArray();
+
+            multipartBodyBuilder.addFormDataPart("image" + i, "Android_Flask_" + i + ".jpg", RequestBody.create(MediaType.parse("image/*jpg"), byteArray));
+        }
+
+        RequestBody postBodyImage = multipartBodyBuilder.build();
         postRequest(postUrl, postBodyImage);
+
     }
 
     private void postRequest(String postUrl, RequestBody postBody) {
 
-        OkHttpClient client = new OkHttpClient();
+        OkHttpClient client = new OkHttpClient()
+                .newBuilder()
+                .connectTimeout(200, TimeUnit.SECONDS)
+                .writeTimeout(200, TimeUnit.SECONDS)
+                .readTimeout(400, TimeUnit.SECONDS)
+                .build();
 
         Request request = new Request.Builder()
                 .url(postUrl)
@@ -208,19 +285,37 @@ public class CameraActivity extends AppCompatActivity {
                 // Cancel the post on failure.
                 call.cancel();
                 Log.d("TAG", "Message: Failed to Connect to Server. Please Try Again. " + e.getMessage());
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        TextView response = findViewById(R.id.response);
+                        response.setText("Failed to connect to server. Please try again.");
+                    }
+                });
             }
 
             @Override
             public void onResponse(Call call, final Response response) throws IOException {
                 Log.d("TAG", "Server's Response\n" + response.body().string());
                 camera.close();
+                camera.destroy();
+                Intent intent = new Intent(CameraActivity.this, MaskedImages.class);
+                intent.putExtra("spacialAngles", spatial_angles);
+                intent.putExtra("numberOfImages", bitmapArrayList.size());
+                startActivity(intent);
             }
         });
     }
 
     private void createFile() {
         File dir = this.getExternalFilesDir(null);
-        pictureFile = new File(dir.getAbsolutePath(), "image_" + System.currentTimeMillis() + ".jpg");
+        assert dir != null;
+        File file = new File(dir.getAbsolutePath(), "/" + System.currentTimeMillis() + "/");
+        frameFile = new File(file.getAbsolutePath(), "/Frames/");
+        frameFile.mkdirs();
+        csvFile = new File(file.getAbsolutePath(), "Data.csv");
+        csvData = new StringBuilder();
+        csvData.append("Azimuth, Angle of Elevation, Angle of rotation, Time");
     }
 
     @Override
@@ -244,5 +339,10 @@ public class CameraActivity extends AppCompatActivity {
         return output;
     }
 
+    private void serverResponse() {
+        progressBar.setVisibility(View.GONE);
+        TextView response = findViewById(R.id.response);
+        response.setText("Server error.");
+    }
 
 }

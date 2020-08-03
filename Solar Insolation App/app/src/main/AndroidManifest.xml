@@ -19,9 +19,9 @@
         android:label="@string/app_name"
         android:roundIcon="@drawable/sun"
         android:supportsRtl="true"
+        android:requestLegacyExternalStorage="true"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true">
-        <activity android:name=".SolarPath"></activity>
         <activity android:name=".MaskedImages" />
         <activity android:name=".CameraActivity" />
         <activity android:name=".Dashboard" />

@@ -32,6 +32,7 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.provider.Settings;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -46,7 +47,6 @@ import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
-import com.opencsv.CSVReader;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -63,15 +63,23 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+
 public class HomeFragment extends Fragment {
 
     private TextView textAzimuth, textAoE, textAoR;
     static float latitude;
     static float longitude;
-    private EditText mLatitude, mLongitude;
+    private EditText mLatitude, mLongitude, url;
     private boolean flag1 = false;
     private ArrayList<Bitmap> imageArray;
-    private Button getLocation, selectFrames, selectData, submit;
+    private Button getLocation, calculate, selectFrames, selectData, submit, go;
     private float mAzimuth, mAngleOfElevation, mAngleOfRotation;
     private LocationManager locationManager;
     private FusedLocationProviderClient fusedLocationProviderClient;
@@ -164,11 +172,14 @@ public class HomeFragment extends Fragment {
         textAoE = view.findViewById(R.id.angleOfElevation);
         textAoR = view.findViewById(R.id.angleOfRotation);
         getLocation = view.findViewById(R.id.getLocation);
+        calculate = view.findViewById(R.id.calculate);
         selectFrames = view.findViewById(R.id.selectFrames);
         selectData = view.findViewById(R.id.selectData);
         submit = view.findViewById(R.id.submit);
+        go = view.findViewById(R.id.go);
         mLatitude = view.findViewById(R.id.latitude);
         mLongitude = view.findViewById(R.id.longitude);
+        url = view.findViewById(R.id.url);
 
         imageArray = new ArrayList<>();
         fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(getActivity());
@@ -208,12 +219,38 @@ public class HomeFragment extends Fragment {
                 startActivityForResult(Intent.createChooser(intent, "Select data"), 90);
             }
         });
+
+        go.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (TextUtils.isEmpty(url.getText().toString())) {
+                    url.setError("Enter url first");
+                } else {
+                    Intent cameraIntent = new Intent(getActivity(), CameraActivity.class);
+                    cameraIntent.putExtra("url", url.getText().toString());
+                    startActivity(cameraIntent);
+                }
+            }
+        });
+
+        calculate.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!(TextUtils.isEmpty(mLatitude.getText().toString()) || TextUtils.isEmpty(mLongitude.getText().toString()))) {
+                    latitude = Float.parseFloat(mLatitude.getText().toString());
+                    longitude = Float.parseFloat(mLongitude.getText().toString());
+                    getData();
+                }
+
+            }
+        });
     }
 
     @Override
     public void onResume() {
         super.onResume();
         setLocation();
+        getData();
     }
 
     @Override
@@ -298,6 +335,74 @@ public class HomeFragment extends Fragment {
                 });
             }
         }
+    }
+
+    private void getData() {
+        String postUrl = "http://192.168.0.108:5000/calculate";
+        String postBodyText = latitude + "_" + 216;
+        MediaType mediaType = MediaType.parse("text/plain; chartset=utf-8");
+        RequestBody postBody = RequestBody.create(mediaType, postBodyText);
+        postRequest(postUrl, postBody);
+    }
+
+    private void postRequest(String postUrl, RequestBody postBody) {
+        OkHttpClient client = new OkHttpClient();
+        Request request = new Request.Builder()
+                .url(postUrl)
+                .post(postBody)
+                .build();
+
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                call.cancel();
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                String responseBody = response.body().string();
+                final String[] data = responseBody.split("_");
+                getActivity().runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        TextView dailyInsolation, yearlyInsolation;
+                        dailyInsolation = getView().findViewById(R.id.dailyInsolation);
+                        yearlyInsolation = getView().findViewById(R.id.yearlyInsolation);
+                        float dailyInsolationValue = Float.parseFloat(data[0]) / 100;
+                        float yearlyInsolationValue = Float.parseFloat(data[data.length -1])/ 100;
+                        dailyInsolation.setText(String.valueOf(dailyInsolationValue));
+                        yearlyInsolation.setText(String.valueOf(yearlyInsolationValue));
+
+                        TextView jan, feb, mar, apr, may, jun, jul, aug, sep, oct, nov, dec;
+                        jan = getView().findViewById(R.id.janInso);
+                        feb = getView().findViewById(R.id.febInso);
+                        mar = getView().findViewById(R.id.marInso);
+                        apr = getView().findViewById(R.id.aprInso);
+                        may = getView().findViewById(R.id.mayInso);
+                        jun = getView().findViewById(R.id.junInso);
+                        jul = getView().findViewById(R.id.julInso);
+                        aug = getView().findViewById(R.id.augInso);
+                        sep = getView().findViewById(R.id.sepInso);
+                        oct = getView().findViewById(R.id.octInso);
+                        nov = getView().findViewById(R.id.novInso);
+                        dec = getView().findViewById(R.id.decInso);
+
+                        jan.setText(String.format(Locale.getDefault(), "%.2f", (Float.parseFloat(data[1]) / 100)));
+                        feb.setText(String.format(Locale.getDefault(), "%.2f", (Float.parseFloat(data[2]) / 100)));
+                        mar.setText(String.format(Locale.getDefault(), "%.2f", (Float.parseFloat(data[3]) / 100)));
+                        apr.setText(String.format(Locale.getDefault(), "%.2f", (Float.parseFloat(data[4]) / 100)));
+                        may.setText(String.format(Locale.getDefault(), "%.2f", (Float.parseFloat(data[5]) / 100)));
+                        jun.setText(String.format(Locale.getDefault(), "%.2f", (Float.parseFloat(data[6]) / 100)));
+                        jul.setText(String.format(Locale.getDefault(), "%.2f", (Float.parseFloat(data[7]) / 100)));
+                        aug.setText(String.format(Locale.getDefault(), "%.2f", (Float.parseFloat(data[8]) / 100)));
+                        sep.setText(String.format(Locale.getDefault(), "%.2f", (Float.parseFloat(data[9]) / 100)));
+                        oct.setText(String.format(Locale.getDefault(), "%.2f", (Float.parseFloat(data[10]) / 100)));
+                        nov.setText(String.format(Locale.getDefault(), "%.2f", (Float.parseFloat(data[11]) / 100)));
+                        dec.setText(String.format(Locale.getDefault(), "%.2f", (Float.parseFloat(data[12]) / 100)));
+                    }
+                });
+            }
+        });
     }
 
     private float[] lowPass(float[] input, float[] output) {

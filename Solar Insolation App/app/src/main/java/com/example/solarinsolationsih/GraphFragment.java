@@ -162,7 +162,7 @@ public class GraphFragment extends Fragment {
 
         for (int MONTH = 0; MONTH < 12; MONTH++) {
             ArrayList<Entry> entry = new ArrayList<>();
-            for (double HOUR = 6; HOUR < 20; HOUR = HOUR + 0.20) {
+            for (double HOUR = 5; HOUR < 20; HOUR = HOUR + 0.20) {
 
                 MINUTE = (HOUR - (int) HOUR) * 60;
                 calendar.set(YEAR, MONTH, DATE, (int) HOUR, (int) MINUTE);
@@ -179,24 +179,28 @@ public class GraphFragment extends Fragment {
                 f = StereographicValues(az, ele, 5); //kept the circle of radius 5
 
                 switch(MONTH) {
-                    case 5 : //FOR JUNE
-                        if(HOUR>=12.5) juneSunPath.add(new Entry(f[0], f[1]));//we need to replace this with local solar time
+                    case 5: //FOR JUNE
+                        if (HOUR >= 12.5)
+                            juneSunPath.add(new Entry(f[0], f[1]));//we need to replace this with local solar time
                         else
-                            f[0] = (-1)*f[0];
+                            f[0] = (-1) * f[0];
                         juneSunPath.add(new Entry(f[0], f[1]));
                         //System.out.println("Excellent!");
+
                         break;
                     case 11 :
-                        if(HOUR>=12.5) decSunPath.add(new Entry(f[0], f[1]));
+                        if (HOUR >= 12.5) decSunPath.add(new Entry(f[0], f[1]));
                         else
-                            f[0] = (-1)*f[0];
+                            f[0] = (-1) * f[0];
                         decSunPath.add(new Entry(f[0], f[1]));
+
                         break;
                     case 2 :
-                        if(HOUR>=12.5) marchSunPath.add(new Entry(f[0], f[1]));
+                        if (HOUR >= 12.5) marchSunPath.add(new Entry(f[0], f[1]));
                         else
-                            f[0] = (-1)*f[0];
+                            f[0] = (-1) * f[0];
                         marchSunPath.add(new Entry(f[0], f[1]));
+
                         break;
                 }
 

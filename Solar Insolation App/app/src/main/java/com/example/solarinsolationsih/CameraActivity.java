@@ -226,7 +226,7 @@ public class CameraActivity extends AppCompatActivity {
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
-//                    connectServer();
+                    connectServer();
 
                 } else {
                     record.setImageResource(R.mipmap.ic_video_red);
@@ -247,7 +247,7 @@ public class CameraActivity extends AppCompatActivity {
     }
 
     private void connectServer() {
-
+        progressBar.setVisibility(View.VISIBLE);
         MultipartBody.Builder multipartBodyBuilder = new MultipartBody.Builder().setType(MultipartBody.FORM);
 
         for (int i = 0; i < bitmapArrayList.size(); i++) {
@@ -296,13 +296,24 @@ public class CameraActivity extends AppCompatActivity {
 
             @Override
             public void onResponse(Call call, final Response response) throws IOException {
-                Log.d("TAG", "Server's Response\n" + response.body().string());
+                String body = response.body().string();
+                Log.d("TAG", "Server's Response\n" + body);
                 camera.close();
-                camera.destroy();
-                Intent intent = new Intent(CameraActivity.this, MaskedImages.class);
-                intent.putExtra("spacialAngles", spatial_angles);
-                intent.putExtra("numberOfImages", bitmapArrayList.size());
-                startActivity(intent);
+                if (body.equals(":)")) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            progressBar.setVisibility(View.GONE);
+                            Intent intent = new Intent(CameraActivity.this, MaskedImages.class);
+                            intent.putExtra("url", url);
+                            intent.putExtra("values", csvData.toString());
+                            intent.putExtra("numberOfImages", bitmapArrayList.size());
+                            startActivity(intent);
+                            finish();
+                        }
+                    });
+                }
+
             }
         });
     }

@@ -1,26 +1,7 @@
-## Team Name
-The Cyborgs
-
-## Organization Name
-Indian Space Research Organization (ISRO)
-
-## PROBLEM STATEMENT
 Generating local sky horizon has important applications for analysis of solar energy potential in an urban setting. Develop a mobile application for automatically detecting sky pixels in a photograph. The application should generate a mask image consisting of sky pixels marked in white colour in the image and other pixels marked in black colour. Further, using information about camera optics, the application should give the angle of elevation of the lowest sky pixel for all pixel columns in the mask image.
 
 ## Data Set link
 [Data Set Link](https://vedas.sac.gov.in/vcms/en/sih2020.html)
-
-## PS NO.
-NM381
-
-## CATEGORY
-Software
-
-## TEAM LEADER NAME
-Prince Sharma
-
-## COLLEGE CODE
-C-6380
 
 ## INTRODUCTION
 SOLUTION DESCRIPTION
